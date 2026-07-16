@@ -3840,9 +3840,10 @@ With @uref{https://github.com/magit/forge, Forge} installed:
 @end lisp
 
 The log then shows Forge's pull requests@comma{} issues@comma{} and discussions@comma{} and
-@code{N} and @code{'} open @code{forge-dispatch}.  This is meant for colocated
-repositories@comma{} where Forge can see a Git repository and its remotes; the
-repository must be tracked in Forge's database.
+@code{N} and @code{'} open @code{forge-dispatch}.  This supports colocated repositories@comma{}
+including sibling jj workspaces without a @code{.git} directory (Majutsu
+initializes Forge from the underlying Git worktree); the repository must
+be tracked in Forge's database.
 
 @defopt majutsu-forge-add-default-sections
 Whether to add the

@@ -2128,9 +2128,10 @@ With [[https://github.com/magit/forge][Forge]] installed:
 #+end_src
 
 The log then shows Forge's pull requests, issues, and discussions, and
-~N~ and ~'~ open ~forge-dispatch~.  This is meant for colocated
-repositories, where Forge can see a Git repository and its remotes; the
-repository must be tracked in Forge's database.
+~N~ and ~'~ open ~forge-dispatch~.  This supports colocated repositories,
+including sibling jj workspaces without a ~.git~ directory (Majutsu
+initializes Forge from the underlying Git worktree); the repository must
+be tracked in Forge's database.
 
 - User Option: majutsu-forge-add-default-sections :: Whether to add the
   topic sections to the log.
