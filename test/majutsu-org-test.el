@@ -41,7 +41,8 @@
   (with-temp-buffer
     (majutsu-log-mode)
     (setq-local majutsu--default-directory "/tmp/repo/")
-    (let (properties)
+    (let ((majutsu-org-revision-storage 'symbolic)
+          properties)
       (cl-letf (((symbol-function 'majutsu-revision-at-point)
                  (lambda () "change-id"))
                 ((symbol-function 'org-link-store-props)
@@ -51,6 +52,29 @@
                      '(:type "majutsu-rev"
                        :link "majutsu-rev:/tmp/repo/::change-id"
                        :description "/tmp/repo/ (majutsu-rev change-id)"))))))
+
+(ert-deftest majutsu-org-canonical-revision/stores-change-id-by-default ()
+  (let ((majutsu-org-revision-storage 'change-id))
+    (cl-letf (((symbol-function 'majutsu-jj-lines)
+               (lambda (&rest args)
+                 (should (equal (car (last args 2)) "-T"))
+                 '("full-change-id"))))
+      (should (equal (majutsu-org--canonical-revision
+                      "main" (majutsu-org--revision-storage-kind))
+                     "full-change-id")))))
+
+(ert-deftest majutsu-org-canonical-revision/prefix-selects-storage-kind ()
+  (let ((majutsu-org-revision-storage 'change-id))
+    (let ((current-prefix-arg '(4)))
+      (should (eq (majutsu-org--revision-storage-kind) 'commit-id)))
+    (let ((current-prefix-arg '(16)))
+      (should (eq (majutsu-org--revision-storage-kind) 'symbolic)))))
+
+(ert-deftest majutsu-org-canonical-revision/preserves-multi-revision-revset ()
+  (cl-letf (((symbol-function 'majutsu-jj-lines)
+             (lambda (&rest _) '("one" "two"))))
+    (should (equal (majutsu-org--canonical-revision "all()" 'change-id)
+                   "all()"))))
 
 (ert-deftest majutsu-org-repository-follow/opens-log-in-repository ()
   (let (directory)

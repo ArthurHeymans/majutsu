@@ -16,10 +16,29 @@
 
 ;;; Code:
 
+(require 'cl-lib)
 (require 'majutsu-diff)
 (require 'majutsu-log)
 (require 'org)
 (require 'subr-x)
+
+(defgroup majutsu-org nil
+  "Org links to Majutsu buffers."
+  :group 'majutsu
+  :group 'org-link)
+
+(defcustom majutsu-org-revision-storage 'change-id
+  "Identity stored in `majutsu-rev' links.
+
+`change-id' follows a logical JJ change across rewrites.  `commit-id'
+stores an immutable commit, while `symbolic' preserves the bookmark,
+tag, revset, or other revision expression found at point.  A single
+universal prefix argument stores a commit id, and two preserve the
+symbolic revision regardless of this option."
+  :group 'majutsu-org
+  :type '(choice (const :tag "Change ID" change-id)
+                 (const :tag "Commit ID" commit-id)
+                 (const :tag "Symbolic revision" symbolic)))
 
 ;;;###autoload
 (with-eval-after-load 'majutsu-mode
@@ -94,11 +113,36 @@ preserved intact."
   "Complete a link to a Majutsu repository log."
   (concat "majutsu:" (abbreviate-file-name (majutsu-org--read-repository))))
 
+(defun majutsu-org--revision-storage-kind ()
+  "Return the requested revision storage kind for the current command."
+  (pcase current-prefix-arg
+    ('(4) 'commit-id)
+    ('(16) 'symbolic)
+    (_ majutsu-org-revision-storage)))
+
+(defun majutsu-org--canonical-revision (revision kind)
+  "Return REVISION converted to the identity specified by KIND.
+
+If REVISION selects other than one commit, preserve it symbolically."
+  (if (eq kind 'symbolic)
+      revision
+    (let* ((template (pcase kind
+                       ('change-id "change_id ++ \"\\n\"")
+                       ('commit-id "commit_id ++ \"\\n\"")))
+           (values (majutsu-jj-lines "log" "--no-graph" "-r" revision
+                                     "-T" template)))
+      (if (= (length values) 1)
+          (car values)
+        revision))))
+
 (defun majutsu-org-revision-store ()
   "Store a link to the JJ revision at point in a Majutsu buffer."
   (when (derived-mode-p 'majutsu-mode)
-    (when-let* ((revision (majutsu-revision-at-point))
-                (repository (majutsu-org--repository)))
+    (when-let* ((source-revision (majutsu-revision-at-point))
+                (repository (majutsu-org--repository))
+                (revision (majutsu-org--canonical-revision
+                           source-revision
+                           (majutsu-org--revision-storage-kind))))
       (org-link-store-props
        :type "majutsu-rev"
        :link (format "majutsu-rev:%s::%s" repository revision)
