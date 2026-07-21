@@ -21,6 +21,7 @@
 (require 'majutsu-log)
 (require 'org)
 (require 'subr-x)
+(require 'url-util)
 
 (defgroup majutsu-org nil
   "Org links to Majutsu buffers."
@@ -67,6 +68,14 @@ symbolic revision regardless of this option."
       (user-error "%s is not inside a JJ repository" directory))
     (file-name-as-directory root)))
 
+(defun majutsu-org--encode-component (value)
+  "Encode VALUE for use as one component of a Majutsu Org link."
+  (replace-regexp-in-string "%2F" "/" (url-hexify-string value) t t))
+
+(defun majutsu-org--decode-component (value)
+  "Decode VALUE from a Majutsu Org link component."
+  (url-unhex-string value))
+
 (defun majutsu-org--split-revision-path (path)
   "Split a majutsu revision link PATH into repository and revision.
 
@@ -77,7 +86,8 @@ preserved intact."
             (revision (substring path (+ separator 2)))
             ((not (string-empty-p repository)))
             ((not (string-empty-p revision))))
-      (cons repository revision)
+      (cons (majutsu-org--decode-component repository)
+            (majutsu-org--decode-component revision))
     (user-error "Invalid majutsu-rev link: %s" path)))
 
 ;;;###autoload
@@ -98,12 +108,13 @@ preserved intact."
     (when-let* ((repository (majutsu-org--repository)))
       (org-link-store-props
        :type "majutsu"
-       :link (concat "majutsu:" repository)
+       :link (concat "majutsu:" (majutsu-org--encode-component repository))
        :description (format "%s (majutsu)" repository)))))
 
 (defun majutsu-org-repository-follow (repository _arg)
   "Open the Majutsu log for REPOSITORY."
-  (let* ((directory (file-name-as-directory (expand-file-name repository)))
+  (let* ((repository (majutsu-org--decode-component repository))
+         (directory (file-name-as-directory (expand-file-name repository)))
          (root (majutsu-toplevel directory)))
     (unless root
       (user-error "%s is not inside a JJ repository" directory))
@@ -111,7 +122,9 @@ preserved intact."
 
 (defun majutsu-org-repository-complete (&optional _arg)
   "Complete a link to a Majutsu repository log."
-  (concat "majutsu:" (abbreviate-file-name (majutsu-org--read-repository))))
+  (concat "majutsu:"
+          (majutsu-org--encode-component
+           (abbreviate-file-name (majutsu-org--read-repository)))))
 
 (defun majutsu-org--revision-storage-kind ()
   "Return the requested revision storage kind for the current command."
@@ -145,7 +158,9 @@ If REVISION selects other than one commit, preserve it symbolically."
                            (majutsu-org--revision-storage-kind))))
       (org-link-store-props
        :type "majutsu-rev"
-       :link (format "majutsu-rev:%s::%s" repository revision)
+       :link (format "majutsu-rev:%s::%s"
+                     (majutsu-org--encode-component repository)
+                     (majutsu-org--encode-component revision))
        :description (format "%s (majutsu-rev %s)" repository revision)))))
 
 (defun majutsu-org-revision-follow (path _arg)
@@ -164,8 +179,9 @@ If REVISION selects other than one commit, preserve it symbolically."
          (default-directory repository)
          (revision (majutsu-read-revset "Revision")))
     (format "majutsu-rev:%s::%s"
-            (abbreviate-file-name repository)
-            revision)))
+            (majutsu-org--encode-component
+             (abbreviate-file-name repository))
+            (majutsu-org--encode-component revision))))
 
 (provide 'majutsu-org)
 ;;; majutsu-org.el ends here
