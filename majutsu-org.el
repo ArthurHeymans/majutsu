@@ -198,20 +198,30 @@ If REVISION selects other than one commit, preserve it symbolically."
           (car values)
         revision))))
 
+(defun majutsu-org--revision-store-1 (source-revision repository)
+  "Store SOURCE-REVISION from REPOSITORY as one `majutsu-rev' link."
+  (let ((revision (majutsu-org--canonical-revision
+                   source-revision
+                   (majutsu-org--revision-storage-kind))))
+    (org-link-store-props
+     :type "majutsu-rev"
+     :link (format "majutsu-rev:%s::%s"
+                   (majutsu-org--encode-component repository)
+                   (majutsu-org--encode-component revision))
+     :description (format "%s (majutsu-rev %s)" repository revision))))
+
 (defun majutsu-org-revision-store ()
-  "Store a link to the JJ revision at point in a Majutsu buffer."
+  "Store links to revisions at point or selected in a Majutsu buffer."
   (when (derived-mode-p 'majutsu-mode)
-    (when-let* ((source-revision (majutsu-revision-at-point))
-                (repository (majutsu-org--repository))
-                (revision (majutsu-org--canonical-revision
-                           source-revision
-                           (majutsu-org--revision-storage-kind))))
-      (org-link-store-props
-       :type "majutsu-rev"
-       :link (format "majutsu-rev:%s::%s"
-                     (majutsu-org--encode-component repository)
-                     (majutsu-org--encode-component revision))
-       :description (format "%s (majutsu-rev %s)" repository revision)))))
+    (when-let* ((repository (majutsu-org--repository))
+                (revisions (or (magit-region-values 'jj-commit t)
+                               (when-let* ((revision
+                                            (majutsu-revision-at-point)))
+                                 (list revision)))))
+      (mapc (lambda (revision)
+              (majutsu-org--revision-store-1 revision repository))
+            revisions)
+      t)))
 
 (defun majutsu-org-revision-follow (path _arg)
   "Open the revision diff identified by majutsu-rev link PATH."
