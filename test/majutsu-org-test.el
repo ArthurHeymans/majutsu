@@ -53,6 +53,45 @@
                        :link "majutsu-rev:/tmp/repo/::change-id"
                        :description "/tmp/repo/ (majutsu-rev change-id)"))))))
 
+(ert-deftest majutsu-org-file-store/stores-blob-location ()
+  (with-temp-buffer
+    (insert "one\ntwo\nthree\n")
+    (goto-char (point-min))
+    (forward-line 1)
+    (setq-local majutsu-blob-mode t)
+    (setq-local majutsu-buffer-blob-path "src/file name.el")
+    (setq-local majutsu-buffer-blob-revision "change")
+    (setq-local default-directory "/tmp/repo/")
+    (let ((majutsu-org-revision-storage 'symbolic)
+          properties)
+      (cl-letf (((symbol-function 'majutsu-toplevel)
+                 (lambda (&optional _) "/tmp/repo/"))
+                ((symbol-function 'org-link-store-props)
+                 (lambda (&rest props) (setq properties props))))
+        (majutsu-org-file-store))
+      (should (equal (plist-get properties :link)
+                     (concat "majutsu-file:/tmp/repo/::change::"
+                             "src/file%20name.el::2"))))))
+
+(ert-deftest majutsu-org-file-follow/opens-line-in-blob ()
+  (let ((buffer (generate-new-buffer " *majutsu org file*")))
+    (unwind-protect
+        (progn
+          (with-current-buffer buffer
+            (insert "one\ntwo\nthree\n"))
+          (cl-letf (((symbol-function 'majutsu-toplevel)
+                     (lambda (&optional dir) dir))
+                    ((symbol-function 'majutsu-find-file)
+                     (lambda (revision file)
+                       (should (equal revision "change"))
+                       (should (equal file "src/file name.el"))
+                       buffer)))
+            (majutsu-org-file-follow
+             "/tmp/repo/::change::src/file%20name.el::2" nil))
+          (with-current-buffer buffer
+            (should (= (line-number-at-pos) 2))))
+      (kill-buffer buffer))))
+
 (ert-deftest majutsu-org-log-store/stores-filtered-log ()
   (with-temp-buffer
     (majutsu-log-mode)
@@ -191,7 +230,11 @@
               #'majutsu-org-revision-follow))
   (should (eq (org-link-get-parameter "majutsu-log" :store)
               #'majutsu-org-log-store))
+  (should (eq (org-link-get-parameter "majutsu-file" :follow)
+              #'majutsu-org-file-follow))
   (should (eq (command-remapping #'org-store-link nil majutsu-mode-map)
+              #'majutsu-org-store-link))
+  (should (eq (command-remapping #'org-store-link nil majutsu-blob-mode-map)
               #'majutsu-org-store-link)))
 
 (provide 'majutsu-org-test)
