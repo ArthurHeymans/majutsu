@@ -54,6 +54,23 @@ and bookmark completion candidates.  Workspace actions can visit, open in
 Dired, or copy the root.  Bookmark actions can edit, diff, inspect evolution,
 move, rename, delete, or forget the selected bookmark.
 
+** Optional Org Integration
+
+When Org is loaded, Majutsu registers link types for repositories, revisions,
+filtered logs, and historical file locations.  Use ~org-store-link~ in a Majutsu
+buffer and ~org-insert-link~ in an Org buffer.
+
+| Link type      | Target                                  |
+|----------------+-----------------------------------------|
+| ~majutsu:~       | Repository log                          |
+| ~majutsu-rev:~   | Revision diff                           |
+| ~majutsu-log:~   | Log filtered by a JJ revset             |
+| ~majutsu-file:~  | File at a revision and line             |
+
+Revision links store full change IDs by default.  Use ~C-u~ with
+~org-store-link~ for an immutable commit ID, or ~C-u C-u~ to preserve the
+bookmark, tag, or revset at point.
+
 ** Essential Keybindings
 
 | Key (Vanilla / Evil) | Action                    |
