@@ -140,6 +140,32 @@
                      "commit-id"))
       (should (equal (cdr (assoc "Tag: v1.0" offered)) "v1.0")))))
 
+(ert-deftest majutsu-org-select-stored-revision/prompts-with-bookmark-only ()
+  (let ((majutsu-org-prompt-for-symbolic-revisions t))
+    (cl-letf (((symbol-function 'majutsu-org--revision-metadata)
+               (lambda (_)
+                 '(:change-id "change" :commit-id "commit"
+                   :bookmarks ("main") :tags nil)))
+              ((symbol-function 'completing-read)
+               (lambda (_prompt choices &rest _)
+                 (should (assoc "Bookmark: main" choices))
+                 "Bookmark: main")))
+      (should (equal (majutsu-org--select-stored-revision "source")
+                     "main")))))
+
+(ert-deftest majutsu-org-select-stored-revision/prompts-with-tag-only ()
+  (let ((majutsu-org-prompt-for-symbolic-revisions t))
+    (cl-letf (((symbol-function 'majutsu-org--revision-metadata)
+               (lambda (_)
+                 '(:change-id "change" :commit-id "commit"
+                   :bookmarks nil :tags ("v1.0"))))
+              ((symbol-function 'completing-read)
+               (lambda (_prompt choices &rest _)
+                 (should (assoc "Tag: v1.0" choices))
+                 "Tag: v1.0")))
+      (should (equal (majutsu-org--select-stored-revision "source")
+                     "v1.0")))))
+
 (ert-deftest majutsu-org-select-stored-revision/skips-prompt-without-symbols ()
   (let ((majutsu-org-prompt-for-symbolic-revisions t))
     (cl-letf (((symbol-function 'majutsu-org--revision-metadata)
