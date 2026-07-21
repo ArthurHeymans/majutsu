@@ -29,6 +29,17 @@
   :group 'majutsu
   :group 'org-link)
 
+(defcustom majutsu-org-prompt-for-symbolic-revisions t
+  "Whether to offer bookmarks and tags when storing revision links.
+
+When t, prompt only when the commit has a bookmark or tag.  When
+`always', prompt for every single commit.  When nil, always use
+`majutsu-org-revision-storage'.  Prefix arguments bypass the prompt."
+  :group 'majutsu-org
+  :type '(choice (const :tag "Never prompt" nil)
+                 (const :tag "Prompt when symbols exist" t)
+                 (const :tag "Always prompt" always)))
+
 (defcustom majutsu-org-revision-storage 'change-id
   "Identity stored in `majutsu-rev' links.
 
@@ -253,6 +264,69 @@ preserved intact."
     ('(16) 'symbolic)
     (_ majutsu-org-revision-storage)))
 
+(defun majutsu-org--revision-metadata (revision)
+  "Return identity metadata when REVISION selects exactly one commit."
+  (let* ((field-separator "\x1e")
+         (list-separator "\x1f")
+         (template
+          (concat "change_id ++ \"\\x1e\" ++ commit_id ++ \"\\x1e\" ++ "
+                  "bookmarks.map(|x| x.name()).join(\"\\x1f\") ++ "
+                  "\"\\x1e\" ++ tags.map(|x| x.name()).join(\"\\x1f\") ++ "
+                  "\"\\n\""))
+         (lines (majutsu-jj-lines "log" "--no-graph" "-r" revision
+                                  "-T" template)))
+    (when (= (length lines) 1)
+      (pcase (split-string (car lines) field-separator nil)
+        (`(,change-id ,commit-id ,bookmarks ,tags)
+         (list :change-id change-id
+               :commit-id commit-id
+               :bookmarks (split-string bookmarks list-separator t)
+               :tags (split-string tags list-separator t)))))))
+
+(defun majutsu-org--short-revision (revision)
+  "Return a compact display form of REVISION."
+  (substring revision 0 (min 12 (length revision))))
+
+(defun majutsu-org--select-stored-revision (source-revision)
+  "Select the identity to store for SOURCE-REVISION."
+  (let ((kind (majutsu-org--revision-storage-kind)))
+    (if (or current-prefix-arg
+            (null majutsu-org-prompt-for-symbolic-revisions))
+        (majutsu-org--canonical-revision source-revision kind)
+      (if-let* ((metadata (majutsu-org--revision-metadata source-revision))
+                (bookmarks (plist-get metadata :bookmarks))
+                (tags (plist-get metadata :tags))
+                ((or (eq majutsu-org-prompt-for-symbolic-revisions 'always)
+                     bookmarks tags)))
+          (let* ((change-id (plist-get metadata :change-id))
+                 (commit-id (plist-get metadata :commit-id))
+                 (choices
+                  (append
+                   `((,(format "Change ID: %s"
+                               (majutsu-org--short-revision change-id))
+                      . ,change-id)
+                     (,(format "Commit ID: %s"
+                               (majutsu-org--short-revision commit-id))
+                      . ,commit-id))
+                   (mapcar (lambda (bookmark)
+                             (cons (format "Bookmark: %s" bookmark) bookmark))
+                           bookmarks)
+                   (mapcar (lambda (tag)
+                             (cons (format "Tag: %s" tag) tag))
+                           tags)))
+                 (default-value
+                  (pcase kind
+                    ('commit-id commit-id)
+                    ('symbolic source-revision)
+                    (_ change-id)))
+                 (default-label
+                  (car (rassoc default-value choices)))
+                 (selection
+                  (completing-read "Store revision as: " choices nil t nil nil
+                                   default-label)))
+            (alist-get selection choices nil nil #'equal))
+        (majutsu-org--canonical-revision source-revision kind)))))
+
 (defun majutsu-org--canonical-revision (revision kind)
   "Return REVISION converted to the identity specified by KIND.
 
@@ -270,9 +344,7 @@ If REVISION selects other than one commit, preserve it symbolically."
 
 (defun majutsu-org--revision-store-1 (source-revision repository)
   "Store SOURCE-REVISION from REPOSITORY as one `majutsu-rev' link."
-  (let ((revision (majutsu-org--canonical-revision
-                   source-revision
-                   (majutsu-org--revision-storage-kind))))
+  (let ((revision (majutsu-org--select-stored-revision source-revision)))
     (org-link-store-props
      :type "majutsu-rev"
      :link (format "majutsu-rev:%s::%s"

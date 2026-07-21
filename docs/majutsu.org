@@ -803,10 +803,15 @@ The following link types are available:
 Repository, revision, and file components are percent-encoded when needed.
 Legacy unescaped repository and revision links remain supported.
 
-Revision links store a full JJ change ID by default, which follows the logical
-change across rewrites.  A single universal prefix argument stores an immutable
-commit ID instead.  Two universal prefix arguments preserve the symbolic
-bookmark, tag, or revset found at point.  This default can be changed with
+When a commit has bookmarks or tags, revision-link storage offers the change
+ID, commit ID, and each bookmark and tag in a completion prompt.  This behavior
+is controlled by ~majutsu-org-prompt-for-symbolic-revisions~.  Commits without
+symbolic names store a full JJ change ID by default, which follows the logical
+change across rewrites.
+
+A single universal prefix argument stores an immutable commit ID without
+prompting.  Two universal prefix arguments preserve the revision expression
+found at point.  The non-interactive default can be changed with
 ~majutsu-org-revision-storage~.
 
 When multiple changesets are selected in a log buffer, one revision link is
