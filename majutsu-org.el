@@ -18,6 +18,7 @@
 
 (require 'cl-lib)
 (require 'majutsu-diff)
+(require 'majutsu-file)
 (require 'majutsu-log)
 (require 'org)
 (require 'subr-x)
@@ -44,6 +45,11 @@ symbolic revision regardless of this option."
 ;;;###autoload
 (with-eval-after-load 'majutsu-mode
   (keymap-set majutsu-mode-map "<remap> <org-store-link>"
+              #'majutsu-org-store-link))
+
+;;;###autoload
+(with-eval-after-load 'majutsu-file
+  (keymap-set majutsu-blob-mode-map "<remap> <org-store-link>"
               #'majutsu-org-store-link))
 
 ;;;###autoload
@@ -103,7 +109,11 @@ preserved intact."
   (org-link-set-parameters "majutsu-log"
                            :store #'majutsu-org-log-store
                            :follow #'majutsu-org-log-follow
-                           :complete #'majutsu-org-log-complete))
+                           :complete #'majutsu-org-log-complete)
+  (org-link-set-parameters "majutsu-file"
+                           :store #'majutsu-org-file-store
+                           :follow #'majutsu-org-file-follow
+                           :complete #'majutsu-org-file-complete))
 
 (defun majutsu-org-repository-store ()
   "Store a link to the current Majutsu repository log."
@@ -176,6 +186,66 @@ preserved intact."
              (abbreviate-file-name repository))
             (majutsu-org--encode-component revision))))
 
+(defun majutsu-org--parse-file-path (path)
+  "Parse majutsu-file link PATH into repository, revision, file and line."
+  (pcase (split-string path "::")
+    (`(,repository ,revision ,file ,line)
+     (let ((line (string-to-number line)))
+       (unless (> line 0)
+         (user-error "Invalid line in majutsu-file link: %s" path))
+       (list (majutsu-org--decode-component repository)
+             (majutsu-org--decode-component revision)
+             (majutsu-org--decode-component file)
+             line)))
+    (_ (user-error "Invalid majutsu-file link: %s" path))))
+
+(defun majutsu-org-file-store ()
+  "Store a link to the current Majutsu blob and line."
+  (when (and (bound-and-true-p majutsu-blob-mode)
+             (bound-and-true-p majutsu-buffer-blob-path))
+    (when-let* ((repository (majutsu-org--repository))
+                (source-revision (majutsu-revision-at-point))
+                (revision (majutsu-org--canonical-revision
+                           source-revision
+                           (majutsu-org--revision-storage-kind)))
+                (file majutsu-buffer-blob-path)
+                (line (line-number-at-pos)))
+      (org-link-store-props
+       :type "majutsu-file"
+       :link (format "majutsu-file:%s::%s::%s::%d"
+                     (majutsu-org--encode-component repository)
+                     (majutsu-org--encode-component revision)
+                     (majutsu-org--encode-component file)
+                     line)
+       :description (format "%s:%d (%s)" file line revision)))))
+
+(defun majutsu-org-file-follow (path _arg)
+  "Open the Majutsu file and line identified by PATH."
+  (pcase-let* ((`(,repository ,revision ,file ,line)
+                 (majutsu-org--parse-file-path path))
+                (default-directory
+                 (file-name-as-directory (expand-file-name repository))))
+    (unless (majutsu-toplevel default-directory)
+      (user-error "%s is not inside a JJ repository" default-directory))
+    (let ((buffer (majutsu-find-file revision file)))
+      (with-current-buffer buffer
+        (goto-char (point-min))
+        (forward-line (1- line))))))
+
+(defun majutsu-org-file-complete (&optional _arg)
+  "Complete a link to a file at a JJ revision."
+  (let* ((repository (majutsu-org--read-repository))
+         (default-directory repository)
+         (revision (majutsu-read-revset "Revision"))
+         (file (majutsu-file--read-path revision repository))
+         (line (read-number "Line: " 1)))
+    (format "majutsu-file:%s::%s::%s::%d"
+            (majutsu-org--encode-component
+             (abbreviate-file-name repository))
+            (majutsu-org--encode-component revision)
+            (majutsu-org--encode-component file)
+            line)))
+
 (defun majutsu-org--revision-storage-kind ()
   "Return the requested revision storage kind for the current command."
   (pcase current-prefix-arg
@@ -212,7 +282,8 @@ If REVISION selects other than one commit, preserve it symbolically."
 
 (defun majutsu-org-revision-store ()
   "Store links to revisions at point or selected in a Majutsu buffer."
-  (when (derived-mode-p 'majutsu-mode)
+  (when (and (derived-mode-p 'majutsu-mode)
+             (not (bound-and-true-p majutsu-buffer-blob-path)))
     (when-let* ((repository (majutsu-org--repository))
                 (revisions (or (magit-region-values 'jj-commit t)
                                (when-let* ((revision
