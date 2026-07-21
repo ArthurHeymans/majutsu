@@ -655,11 +655,13 @@ fields assigned to the @code{heading} module plus any auxiliary fields assigned 
 the @code{tail} module in @code{majutsu-log-commit-columns} (for example@comma{} author and
 timestamp). Graph prefixes and graph-related indentation are rendered as
 display-only prefix decoration rather than real buffer text@comma{} so they do not get
-copied accidentally and point does not land on them as editable text. When a
-revision has @code{body} module content (for example@comma{} continuation lines from a long
-description)@comma{} that content forms the foldable section body; its current
-visibility follows the section state instead of being forced closed on every
-refresh.
+copied accidentally and point does not land on them as editable text. Commit
+sections are expanded by default; set
+@code{majutsu-log-commit-sections-initially-hidden} to @code{t} to collapse them
+initially. When a revision has @code{body} module content (for example@comma{} continuation
+lines from a long description)@comma{} that content forms the foldable section body;
+its current visibility follows the section state instead of being forced closed
+on every refresh.
 
 Press @samp{[} to jump to a visible parent and @samp{]} to jump to a visible child. When
 more than one target is visible@comma{} completion returns the canonical revision id
@@ -3086,6 +3088,12 @@ Extra @samp{KEY=VALUE} entries prepended
 Flat log row column declarations
   controlling templates@comma{} modules@comma{} face policy@comma{} and postprocessing. For protocol
   details@comma{} module semantics@comma{} and examples@comma{} see @emph{Inspecting -> Log Buffer}.
+@end defopt
+
+@defopt majutsu-log-commit-sections-initially-hidden
+When non-nil@comma{}
+  commit sections in log buffers start collapsed. The default is @samp{nil}@comma{} which
+  leaves them expanded; users can still toggle individual sections with @samp{TAB}.
 @end defopt
 
 @table @asis
