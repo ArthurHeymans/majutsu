@@ -101,6 +101,22 @@
     (should (equal (majutsu-org--canonical-revision "all()" 'change-id)
                    "all()"))))
 
+(ert-deftest majutsu-org-revision-store/stores-selected-revisions ()
+  (with-temp-buffer
+    (majutsu-log-mode)
+    (setq-local majutsu--default-directory "/tmp/repo/")
+    (let ((majutsu-org-revision-storage 'symbolic)
+          links)
+      (cl-letf (((symbol-function 'magit-region-values)
+                 (lambda (&rest _) '("first" "second")))
+                ((symbol-function 'org-link-store-props)
+                 (lambda (&rest props)
+                   (push (plist-get props :link) links))))
+        (should (majutsu-org-revision-store)))
+      (should (equal (nreverse links)
+                     '("majutsu-rev:/tmp/repo/::first"
+                       "majutsu-rev:/tmp/repo/::second"))))))
+
 (ert-deftest majutsu-org-repository-follow/opens-log-in-repository ()
   (let (directory)
     (cl-letf (((symbol-function 'majutsu-toplevel)
