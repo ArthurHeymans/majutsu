@@ -125,4 +125,6 @@ Instead of invoking this alias for `majutsu-log' using
 (with-eval-after-load 'embark
   (require 'majutsu-embark))
 
+(with-eval-after-load 'org
+  (require 'majutsu-org nil t))
 ;;; majutsu.el ends here
