@@ -789,6 +789,29 @@ Tag commands are intentionally dispatch-first.
 Tag prompts use completion candidates from local tags. Existing tags are shown for
 selection, while set/delete prompts still allow entering string patterns manually.
 
+* Org Integration
+
+Majutsu integrates with Org when Org is loaded.  In Majutsu buffers,
+~org-store-link~ stores a link suitable for insertion with ~org-insert-link~.
+The following link types are available:
+
+- ~majutsu:/path/to/repo/~ :: Open the repository's default Majutsu log.
+- ~majutsu-rev:/path/to/repo/::REV~ :: Open a revision diff.
+- ~majutsu-log:/path/to/repo/::REVSET~ :: Restore a log filtered by a JJ revset.
+- ~majutsu-file:/path/to/repo/::REV::FILE::LINE~ :: Open a historical file at a line.
+
+Repository, revision, and file components are percent-encoded when needed.
+Legacy unescaped repository and revision links remain supported.
+
+Revision links store a full JJ change ID by default, which follows the logical
+change across rewrites.  A single universal prefix argument stores an immutable
+commit ID instead.  Two universal prefix arguments preserve the symbolic
+bookmark, tag, or revset found at point.  This default can be changed with
+~majutsu-org-revision-storage~.
+
+When multiple changesets are selected in a log buffer, one revision link is
+stored for each selected change.
+
 * Git Integration
 ** Git Transient
 - Key: G (Emacs) / ? G (Evil) (majutsu-git-transient) ::
