@@ -92,6 +92,18 @@
     (should-error (majutsu-org-repository-follow "/tmp/not-a-repo" nil)
                   :type 'user-error)))
 
+(ert-deftest majutsu-org-components/round-trip-special-characters ()
+  (let* ((value "/tmp/repo:one/with spaces/%done")
+         (encoded (majutsu-org--encode-component value)))
+    (should-not (string-match-p "[ :]" encoded))
+    (should (string-prefix-p "/tmp/" encoded))
+    (should (equal (majutsu-org--decode-component encoded) value))))
+
+(ert-deftest majutsu-org-split-revision-path/decodes-components ()
+  (should (equal (majutsu-org--split-revision-path
+                  "/tmp/repo%3Aone/::main%3A%3A%40")
+                 '("/tmp/repo:one/" . "main::@"))))
+
 (ert-deftest majutsu-org-split-revision-path/preserves-revset-operators ()
   (should (equal (majutsu-org--split-revision-path
                   "/tmp/repo/::main::@ & ~tags()")
