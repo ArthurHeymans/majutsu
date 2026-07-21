@@ -67,10 +67,12 @@ buffer and ~org-insert-link~ in an Org buffer.
 | ~majutsu-log:~   | Log filtered by a JJ revset             |
 | ~majutsu-file:~  | File at a revision and line             |
 
-When a commit has bookmarks or tags, storing a revision link prompts for a
-change ID, commit ID, bookmark, or tag.  Otherwise it stores a full change ID
-by default.  Use ~C-u~ with ~org-store-link~ for an immutable commit ID without
-prompting, or ~C-u C-u~ to preserve the revision expression at point.
+When a commit has at least one bookmark or tag, storing a revision link prompts
+for its change ID, commit ID, and each available symbolic name.  This also
+applies when only bookmarks or only tags are present.  Otherwise Majutsu stores
+a full change ID by default.  Use ~C-u~ with ~org-store-link~ for an immutable
+commit ID without prompting, or ~C-u C-u~ to preserve the revision expression
+at point.
 
 ** Essential Keybindings
 

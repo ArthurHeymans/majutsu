@@ -41,6 +41,7 @@ efficiency and comfort Emacs users expect.
 * Conflict Resolution::          Detect Jujutsu conflicts, enter conflict mode, and choose or refine resolutions.
 * Bookmarks::                    Create, move, track, and inspect Jujutsu bookmarks.
 * Tags::                         Create, move, delete, and inspect Jujutsu tags.
+* Org Integration::
 * Git Integration::              Synchronize Git remotes and upload changes for Gerrit review.
 * Workspaces::                   Create, visit, rename, and maintain Jujutsu workspaces.
 * Customizing::                  Configure Majutsu behavior, display, key bindings, and repository defaults.
@@ -2620,6 +2621,51 @@ Delete tag(s) by name or pattern.
 Tag prompts use completion candidates from local tags. Existing tags are shown
 for selection@comma{} while set/delete prompts still allow entering string patterns
 manually.
+
+@node Org Integration
+@chapter Org Integration
+
+Majutsu integrates with Org when Org is loaded.  In Majutsu buffers@comma{}
+@code{org-store-link} stores a link suitable for insertion with @code{org-insert-link}.
+The following link types are available:
+
+@table @asis
+@item @code{majutsu:/path/to/repo/}
+Open the repository's default Majutsu log.
+@item @code{majutsu-rev:/path/to/repo/::REV}
+Open a revision diff.
+@item @code{majutsu-log:/path/to/repo/::REVSET}
+Restore a log filtered by a JJ revset.
+@item @code{majutsu-file:/path/to/repo/::REV::FILE::LINE}
+Open a historical file at a line.
+@end table
+
+Repository@comma{} revision@comma{} and file components are percent-encoded when needed.
+Legacy unescaped repository and revision links remain supported.
+
+When a commit has at least one bookmark or tag@comma{} revision-link storage offers
+the change ID@comma{} commit ID@comma{} and every available symbolic name in a completion
+prompt.  A commit does not need to have both kinds: bookmark-only and tag-only
+commits prompt as well.  For example:
+
+@example
+Store revision as: Change ID: rvvytnpxovkw
+                   Commit ID: 9e54b1aee235
+                   Bookmark: main
+                   Tag: v0.6.0
+@end example
+
+This behavior is controlled by @code{majutsu-org-prompt-for-symbolic-revisions}.
+Commits without symbolic names store a full JJ change ID by default@comma{} which
+follows the logical change across rewrites.
+
+A single universal prefix argument stores an immutable commit ID without
+prompting.  Two universal prefix arguments preserve the revision expression
+found at point.  The non-interactive default can be changed with
+@code{majutsu-org-revision-storage}.
+
+When multiple changesets are selected in a log buffer@comma{} one revision link is
+stored for each selected change.
 
 @node Git Integration
 @chapter Git Integration

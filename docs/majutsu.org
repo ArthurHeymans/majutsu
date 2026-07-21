@@ -1448,11 +1448,21 @@ The following link types are available:
 Repository, revision, and file components are percent-encoded when needed.
 Legacy unescaped repository and revision links remain supported.
 
-When a commit has bookmarks or tags, revision-link storage offers the change
-ID, commit ID, and each bookmark and tag in a completion prompt.  This behavior
-is controlled by ~majutsu-org-prompt-for-symbolic-revisions~.  Commits without
-symbolic names store a full JJ change ID by default, which follows the logical
-change across rewrites.
+When a commit has at least one bookmark or tag, revision-link storage offers
+the change ID, commit ID, and every available symbolic name in a completion
+prompt.  A commit does not need to have both kinds: bookmark-only and tag-only
+commits prompt as well.  For example:
+
+#+begin_example
+Store revision as: Change ID: rvvytnpxovkw
+                   Commit ID: 9e54b1aee235
+                   Bookmark: main
+                   Tag: v0.6.0
+#+end_example
+
+This behavior is controlled by ~majutsu-org-prompt-for-symbolic-revisions~.
+Commits without symbolic names store a full JJ change ID by default, which
+follows the logical change across rewrites.
 
 A single universal prefix argument stores an immutable commit ID without
 prompting.  Two universal prefix arguments preserve the revision expression
