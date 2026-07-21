@@ -128,4 +128,7 @@ Instead of invoking this alias for `majutsu-log' using
 (with-eval-after-load 'evil
   (require 'majutsu-evil nil t))
 
+(with-eval-after-load 'org
+  (require 'majutsu-org nil t))
+
 ;;; majutsu.el ends here
