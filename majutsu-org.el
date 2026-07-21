@@ -293,38 +293,39 @@ preserved intact."
     (if (or current-prefix-arg
             (null majutsu-org-prompt-for-symbolic-revisions))
         (majutsu-org--canonical-revision source-revision kind)
-      (if-let* ((metadata (majutsu-org--revision-metadata source-revision))
-                (bookmarks (plist-get metadata :bookmarks))
-                (tags (plist-get metadata :tags))
-                ((or (eq majutsu-org-prompt-for-symbolic-revisions 'always)
-                     bookmarks tags)))
-          (let* ((change-id (plist-get metadata :change-id))
-                 (commit-id (plist-get metadata :commit-id))
-                 (choices
-                  (append
-                   `((,(format "Change ID: %s"
-                               (majutsu-org--short-revision change-id))
-                      . ,change-id)
-                     (,(format "Commit ID: %s"
-                               (majutsu-org--short-revision commit-id))
-                      . ,commit-id))
-                   (mapcar (lambda (bookmark)
-                             (cons (format "Bookmark: %s" bookmark) bookmark))
-                           bookmarks)
-                   (mapcar (lambda (tag)
-                             (cons (format "Tag: %s" tag) tag))
-                           tags)))
-                 (default-value
-                  (pcase kind
-                    ('commit-id commit-id)
-                    ('symbolic source-revision)
-                    (_ change-id)))
-                 (default-label
-                  (car (rassoc default-value choices)))
-                 (selection
-                  (completing-read "Store revision as: " choices nil t nil nil
-                                   default-label)))
-            (alist-get selection choices nil nil #'equal))
+      (if-let* ((metadata (majutsu-org--revision-metadata source-revision)))
+          (let ((bookmarks (plist-get metadata :bookmarks))
+                (tags (plist-get metadata :tags)))
+            (if (or (eq majutsu-org-prompt-for-symbolic-revisions 'always)
+                    bookmarks tags)
+                (let* ((change-id (plist-get metadata :change-id))
+                       (commit-id (plist-get metadata :commit-id))
+                       (choices
+                        (append
+                         `((,(format "Change ID: %s"
+                                     (majutsu-org--short-revision change-id))
+                            . ,change-id)
+                           (,(format "Commit ID: %s"
+                                     (majutsu-org--short-revision commit-id))
+                            . ,commit-id))
+                         (mapcar (lambda (bookmark)
+                                   (cons (format "Bookmark: %s" bookmark) bookmark))
+                                 bookmarks)
+                         (mapcar (lambda (tag)
+                                   (cons (format "Tag: %s" tag) tag))
+                                 tags)))
+                       (default-value
+                        (pcase kind
+                          ('commit-id commit-id)
+                          ('symbolic source-revision)
+                          (_ change-id)))
+                       (default-label
+                        (car (rassoc default-value choices)))
+                       (selection
+                        (completing-read "Store revision as: " choices nil t nil nil
+                                         default-label)))
+                  (alist-get selection choices nil nil #'equal))
+              (majutsu-org--canonical-revision source-revision kind)))
         (majutsu-org--canonical-revision source-revision kind)))))
 
 (defun majutsu-org--canonical-revision (revision kind)
