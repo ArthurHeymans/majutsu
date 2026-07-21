@@ -11,8 +11,8 @@
 
 ;;; Commentary:
 
-;; This library defines the Org link types `majutsu' and `majutsu-rev'.
-;; The former opens a repository log and the latter opens a revision diff.
+;; This library defines Org links for Majutsu repositories, revisions,
+;; revision-filtered logs, and historical file locations.
 
 ;;; Code:
 
