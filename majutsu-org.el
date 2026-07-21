@@ -99,12 +99,18 @@ preserved intact."
   (org-link-set-parameters "majutsu-rev"
                            :store #'majutsu-org-revision-store
                            :follow #'majutsu-org-revision-follow
-                           :complete #'majutsu-org-revision-complete))
+                           :complete #'majutsu-org-revision-complete)
+  (org-link-set-parameters "majutsu-log"
+                           :store #'majutsu-org-log-store
+                           :follow #'majutsu-org-log-follow
+                           :complete #'majutsu-org-log-complete))
 
 (defun majutsu-org-repository-store ()
   "Store a link to the current Majutsu repository log."
   (when (and (derived-mode-p 'majutsu-mode)
-             (not (majutsu-revision-at-point)))
+             (not (majutsu-revision-at-point))
+             (not (and (derived-mode-p 'majutsu-log-mode)
+                       (majutsu-org--log-revset))))
     (when-let* ((repository (majutsu-org--repository)))
       (org-link-store-props
        :type "majutsu"
@@ -125,6 +131,50 @@ preserved intact."
   (concat "majutsu:"
           (majutsu-org--encode-component
            (abbreviate-file-name (majutsu-org--read-repository)))))
+
+(defun majutsu-org--log-revset ()
+  "Return the revision filter represented by the current log buffer."
+  (when (derived-mode-p 'majutsu-log-mode)
+    (when-let* ((argument
+                 (seq-find (lambda (item)
+                             (string-prefix-p "--revisions=" item))
+                           majutsu-buffer-log-args)))
+      (substring argument (length "--revisions=")))))
+
+(defun majutsu-org-log-store ()
+  "Store the revision-filtered view of the current Majutsu log."
+  (when (and (derived-mode-p 'majutsu-log-mode)
+             (not (majutsu-revision-at-point)))
+    (when-let* ((revision (majutsu-org--log-revset))
+                (repository (majutsu-org--repository)))
+      (org-link-store-props
+       :type "majutsu-log"
+       :link (format "majutsu-log:%s::%s"
+                     (majutsu-org--encode-component repository)
+                     (majutsu-org--encode-component revision))
+       :description (format "%s (majutsu-log %s)" repository revision)))))
+
+(defun majutsu-org-log-follow (path _arg)
+  "Open the revision-filtered Majutsu log identified by PATH."
+  (pcase-let* ((`(,repository . ,revision)
+                 (majutsu-org--split-revision-path path))
+                (default-directory
+                 (file-name-as-directory (expand-file-name repository))))
+    (unless (majutsu-toplevel default-directory)
+      (user-error "%s is not inside a JJ repository" default-directory))
+    (majutsu-setup-buffer #'majutsu-log-mode t
+      (majutsu-buffer-log-args (list (concat "--revisions=" revision)))
+      (majutsu-buffer-log-filesets nil))))
+
+(defun majutsu-org-log-complete (&optional _arg)
+  "Complete a link to a revision-filtered Majutsu log."
+  (let* ((repository (majutsu-org--read-repository))
+         (default-directory repository)
+         (revision (majutsu-read-revset "Log revset")))
+    (format "majutsu-log:%s::%s"
+            (majutsu-org--encode-component
+             (abbreviate-file-name repository))
+            (majutsu-org--encode-component revision))))
 
 (defun majutsu-org--revision-storage-kind ()
   "Return the requested revision storage kind for the current command."
