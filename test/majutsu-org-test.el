@@ -53,6 +53,31 @@
                        :link "majutsu-rev:/tmp/repo/::change-id"
                        :description "/tmp/repo/ (majutsu-rev change-id)"))))))
 
+(ert-deftest majutsu-org-log-store/stores-filtered-log ()
+  (with-temp-buffer
+    (majutsu-log-mode)
+    (setq-local majutsu--default-directory "/tmp/repo/")
+    (setq-local majutsu-buffer-log-args '("--no-graph" "--revisions=main::@"))
+    (let (properties)
+      (cl-letf (((symbol-function 'majutsu-revision-at-point) #'ignore)
+                ((symbol-function 'org-link-store-props)
+                 (lambda (&rest props) (setq properties props))))
+        (majutsu-org-log-store))
+      (should (equal (plist-get properties :link)
+                     "majutsu-log:/tmp/repo/::main%3A%3A%40")))))
+
+(ert-deftest majutsu-org-log-follow/restores-revision-filter ()
+  (let (captured-bindings)
+    (cl-letf (((symbol-function 'majutsu-toplevel)
+               (lambda (&optional dir) dir))
+              ((symbol-function 'majutsu-setup-buffer-internal)
+               (lambda (_mode locked bindings &rest _)
+                 (should locked)
+                 (setq captured-bindings bindings))))
+      (majutsu-org-log-follow "/tmp/repo/::main%3A%3A%40" nil))
+    (should (equal (cadr (assq 'majutsu-buffer-log-args captured-bindings))
+                   '("--revisions=main::@")))))
+
 (ert-deftest majutsu-org-canonical-revision/stores-change-id-by-default ()
   (let ((majutsu-org-revision-storage 'change-id))
     (cl-letf (((symbol-function 'majutsu-jj-lines)
@@ -148,6 +173,8 @@
               #'majutsu-org-repository-store))
   (should (eq (org-link-get-parameter "majutsu-rev" :follow)
               #'majutsu-org-revision-follow))
+  (should (eq (org-link-get-parameter "majutsu-log" :store)
+              #'majutsu-org-log-store))
   (should (eq (command-remapping #'org-store-link nil majutsu-mode-map)
               #'majutsu-org-store-link)))
 
