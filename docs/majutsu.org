@@ -1433,6 +1433,11 @@ for selection, while set/delete prompts still allow entering string patterns
 manually.
 
 * Org Integration
+:PROPERTIES:
+:CUSTOM_ID: org-integration
+:EXPORT_FILE_NAME: extend/org-integration
+:DESCRIPTION: Store and follow Majutsu repository, revision, log, and file links in Org.
+:END:
 
 Majutsu integrates with Org when Org is loaded.  In Majutsu buffers,
 ~org-store-link~ stores a link suitable for insertion with ~org-insert-link~.
