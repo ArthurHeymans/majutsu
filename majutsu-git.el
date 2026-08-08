@@ -333,11 +333,12 @@ Prompts for SOURCE and optional DEST; uses ARGS."
   :prompt "Branch: ")
 
 (transient-define-argument majutsu-git:--bookmark ()
-  :description "Bookmark"
+  :description "Bookmarks"
   :class 'transient-option
   :shortarg "-b"
   :argument "--bookmark="
   :multi-value 'repeat
+  :prompt "Bookmarks/patterns: "
   :reader #'majutsu-read-bookmark-patterns)
 
 (transient-define-argument majutsu-git:--tag ()

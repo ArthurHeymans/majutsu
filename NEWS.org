@@ -74,6 +74,10 @@
 
 ** Changed
 
+- Git push makes multi-bookmark selection explicit ::
+  The bookmark prompt is plural and accepts multiple bookmark names or
+  patterns, producing one repeated =--bookmark= argument per selection.
+
 - Metaedit supports visual multi-revision selection ::
   The Metaedit transient preselects revisions from the region, point, or =@=,
   and ~r~ can toggle additional point or region revisions with selection

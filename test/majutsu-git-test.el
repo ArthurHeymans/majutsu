@@ -191,6 +191,18 @@
       (should (eq (oref obj multi-value) 'repeat))
       (should (eq reader #'majutsu-read-tag-patterns)))))
 
+(ert-deftest majutsu-git-push-bookmarks/builds-repeated-arguments ()
+  "Push should accept multiple bookmarks in one jj invocation."
+  (let* ((suffix (transient-get-suffix 'majutsu-git-push-transient "-b"))
+         (command (plist-get (cdr suffix) :command))
+         (prototype (get command 'transient--suffix))
+         (obj (clone prototype)))
+    (should (equal (oref obj prompt) "Bookmarks/patterns: "))
+    (should (eq (oref obj multi-value) 'repeat))
+    (oset obj value '("main" "glob:release-*"))
+    (should (equal (transient-infix-value obj)
+                   '("--bookmark=main" "--bookmark=glob:release-*")))))
+
 (defun majutsu-git-test--suffix-reader (suffix)
   "Return the reader configured for transient SUFFIX."
   (or (plist-get (cdr suffix) :reader)
