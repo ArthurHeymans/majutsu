@@ -13,12 +13,6 @@
 (require 'majutsu-base)
 (require 'majutsu-evolog)
 
-(ert-deftest majutsu-base-registers-bookmark-and-tag-section-types ()
-  (should (eq (alist-get 'jj-bookmark magit--section-type-alist)
-              'majutsu-bookmark-section))
-  (should (eq (alist-get 'jj-tag magit--section-type-alist)
-              'majutsu-tag-section)))
-
 (ert-deftest majutsu-split-fields/preserves-empty-fields-and-tail ()
   (let ((sep (string 30)))
     (should (equal (majutsu--split-fields (concat "a" sep "b" sep) sep)

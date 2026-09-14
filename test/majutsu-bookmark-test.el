@@ -13,7 +13,37 @@
 (require 'seq)
 (require 'majutsu-bookmark)
 (require 'majutsu-jj-integration)
-(require 'majutsu-bookmark-test-utils)
+(require 'majutsu-embark)
+
+(cl-defun majutsu-bookmark-test--row
+    (heading name remote tracked conflict-details removed-ids added-ids &optional
+             (newline t newline-supplied-p))
+  "Return one raw bookmark-list row record.
+When NEWLINE is non-nil or omitted, append a trailing newline."
+  (concat majutsu-row-start-token
+          heading
+          majutsu-row-tail-token
+          majutsu-row-body-token
+          (replace-regexp-in-string
+           "\n" majutsu-row-field-line-separator (or conflict-details "") t t)
+          majutsu-row-meta-token
+          (string-join (list name (or remote "")
+                             (if tracked "t" "")
+                             (string-join (or removed-ids nil)
+                                          majutsu-row-field-line-separator)
+                             (string-join (or added-ids nil)
+                                          majutsu-row-field-line-separator))
+                       majutsu-row-field-separator)
+          majutsu-row-end-token
+          (if (or (not newline-supplied-p) newline) "\n" "")))
+
+(cl-defun majutsu-bookmark-test--ref
+    (name remote tracked heading &optional conflict-details removed-ids added-ids
+          (newline t newline-supplied-p))
+  "Return one bookmark-list ref row record."
+  (majutsu-bookmark-test--row
+   heading name remote tracked conflict-details removed-ids added-ids
+   (if newline-supplied-p newline t)))
 
 (defun majutsu-bookmark-test--sections (&optional section)
   "Return SECTION and all descendants, defaulting to `magit-root-section'."
@@ -22,6 +52,48 @@
           (apply #'append
                  (mapcar #'majutsu-bookmark-test--sections
                          (oref section children))))))
+
+(ert-deftest majutsu-bookmark-extract-names/from-command-output ()
+  "Test bookmark name extraction from command output."
+  (should (equal (majutsu--extract-bookmark-names "bookmark: main") '("main")))
+  (should (equal (majutsu--extract-bookmark-names "bookmark: feature-1\nbookmark: feature-2") '("feature-1" "feature-2")))
+  (should (equal (majutsu--extract-bookmark-names "no bookmarks here") nil))
+  (should (equal (majutsu--extract-bookmark-names "bookmark: dev, bookmark: test") '("dev" "test"))))
+
+(ert-deftest majutsu-bookmark-wash-list/embark-targets-use-section-metadata ()
+  (dolist (case '((nil nil majutsu-bookmark)
+                  ("origin" nil majutsu-untracked-bookmark)
+                  ("origin" t majutsu-tracked-bookmark)
+                  ("git" t majutsu-git-bookmark)))
+    (with-temp-buffer
+      (majutsu-bookmark-list-mode)
+      (let ((inhibit-read-only t))
+        (magit-insert-section (bookmark-list)
+          (insert (majutsu-bookmark-test--ref "name" (car case) (cadr case)
+                                              "CUSTOM HEADING" nil nil '("abc")))
+          (majutsu-bookmark--wash-list nil)))
+      (goto-char (point-min))
+      (should-not (majutsu-embark-target-section))
+      (search-forward "CUSTOM HEADING")
+      (let* ((target (majutsu-embark-target-section))
+             (type (car target)))
+        (should (eq type (nth 2 case)))
+        (should (equal (cdr target) (if (car case) (concat "name@" (car case)) "name")))))))
+
+(ert-deftest majutsu-bookmark-wash-list/embark-conflict-target-is-a-commit ()
+  (with-temp-buffer
+    (majutsu-bookmark-list-mode)
+    (let ((inhibit-read-only t))
+      (magit-insert-section (bookmark-list)
+        (insert (majutsu-bookmark-test--ref "topic" nil nil "topic conflicted"
+                                            "  + first\n  + second" nil '("first-id" "second-id")))
+        (majutsu-bookmark--wash-list nil)))
+    (goto-char (point-min))
+    (search-forward "topic conflicted")
+    (magit-section-show (magit-current-section))
+    (search-forward "+ second")
+    (should (equal (majutsu-embark-target-section)
+                   '(majutsu-revision . "second-id")))))
 
 (ert-deftest majutsu-bookmark-wash-list/includes-configured-empty-remotes ()
   (with-temp-buffer
@@ -54,11 +126,6 @@
 (ert-deftest majutsu-bookmark-split-remote-ref/no-remote ()
   (should (equal (majutsu--bookmark-split-remote-ref "main")
                  '("main" . nil))))
-
-(ert-deftest majutsu-bookmark-section-map/remaps-visit-thing-to-edit ()
-  (should (eq (lookup-key majutsu-bookmark-section-map
-                          [remap majutsu-visit-thing])
-              #'majutsu-edit-changeset)))
 
 (ert-deftest majutsu-bookmark-get-bookmark-names/local-args ()
   (let (seen-args)

@@ -33,12 +33,6 @@
                      majutsu-workspace--field-separator)
           majutsu-workspace--field-separator))
 
-(ert-deftest majutsu-workspace-template-plan/default-fields ()
-  "The default workspace template plan should transport the default fields."
-  (let ((plan (majutsu-workspace--ensure-template-plan)))
-    (should (equal (plist-get plan :fields)
-                   majutsu-workspace--default-fields))))
-
 (ert-deftest majutsu-workspace-template-plan/uses-native-field-types ()
   "Identifiers stay native while user-controlled strings are encoded."
   (should

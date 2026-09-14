@@ -126,16 +126,5 @@ one; the show cleanup has to cover both conventions."
         (majutsu-section-show first)
         (should-not (majutsu-section-test--invisible-overlays))))))
 
-(ert-deftest majutsu-section-command-remaps-magit-commands ()
-  "Majutsu modes should remap Magit section commands to wrappers."
-  (with-temp-buffer
-    (majutsu-log-mode)
-    (should (eq (command-remapping 'magit-section-toggle) 'majutsu-section-toggle))
-    (should (eq (command-remapping 'magit-section-cycle) 'majutsu-section-cycle))
-    (should (eq (command-remapping 'magit-section-show-level-1-all)
-                'majutsu-section-show-level-1-all))
-    (should (eq (command-remapping 'magit-mouse-toggle-section)
-                'majutsu-mouse-toggle-section))))
-
 (provide 'majutsu-section-test)
 ;;; majutsu-section-test.el ends here

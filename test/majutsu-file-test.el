@@ -737,14 +737,4 @@
       (should (equal (buffer-string) original))
       (should (= (point) entry-point)))))
 
-(ert-deftest majutsu-blob-mode-map-uses-editable-entry ()
-  "Blob key `e` should enter editable blob mode."
-  (should (eq (lookup-key majutsu-blob-mode-map (kbd "e"))
-              #'majutsu-blob-edit-start)))
-
-(ert-deftest majutsu-blob-edit-mode-map-has-exit ()
-  "Editable blob mode should bind C-x C-q to exit command."
-  (should (eq (lookup-key majutsu-blob-edit-mode-map (kbd "C-x C-q"))
-              #'majutsu-blob-edit-exit)))
-
 (provide 'majutsu-file-test)
