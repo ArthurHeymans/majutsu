@@ -581,21 +581,21 @@
         (should (equal (substring-no-properties prefix) "│ "))))))
 
 (ert-deftest majutsu-log-tail-spacer-display-uses-pixels-on-gui ()
-  "Tail spacer display should use absolute pixel targets on GUI."
+  "Tail spacer display should use window-relative pixel targets on GUI."
   (cl-letf (((symbol-function 'display-graphic-p) (lambda (&optional _display) t))
             ((symbol-function 'string-pixel-width) (lambda (_string &optional _buffer) 37))
             ((symbol-function 'window-body-width) (lambda (&optional _window pixelwise) (if pixelwise 200 80))))
     (with-temp-buffer
       (should (equal (majutsu-row-tail-spacer-display "tail" 'fake-window)
-                     '(space :align-to (163)))))))
+                     '(space :align-to (- right (37))))))))
 
 (ert-deftest majutsu-log-tail-spacer-display-uses-columns-on-terminal ()
-  "Tail spacer display should use absolute columns on terminal frames."
+  "Tail spacer display should use window-relative columns on terminals."
   (cl-letf (((symbol-function 'display-graphic-p) (lambda (&optional _display) nil))
             ((symbol-function 'window-body-width) (lambda (&optional _window &rest _args) 80)))
     (with-temp-buffer
       (should (equal (majutsu-row-tail-spacer-display "tail" 'fake-window)
-                     '(space :align-to 75))))))
+                     '(space :align-to (- right 5)))))))
 
 (ert-deftest majutsu-log-refresh-tail-spacers-recomputes-display ()
   "Refreshing tail spacers should recompute their align-to display specs."
@@ -635,7 +635,7 @@
                      '(61 . 1))))
           (majutsu-row-refresh-tail-spacers))
         (should (equal (get-text-property spacer-pos 'display)
-                       '(space :align-to (139))))))))
+                       '(space :align-to (- right (61)))))))))
 
 (ert-deftest majutsu-log-refresh-tail-spacers-uses-terminal-columns ()
   "Refreshing tail spacers should use column targets on terminal frames."
@@ -666,7 +666,7 @@
                    (lambda (&optional _window &rest _args) 80)))
           (majutsu-row-refresh-tail-spacers))
         (should (equal (get-text-property spacer-pos 'display)
-                       '(space :align-to 71)))))))
+                       '(space :align-to (- right 9))))))))
 
 (ert-deftest majutsu-log-refresh-tail-spacers-prefers-explicit-window ()
   "Refreshing tail spacers should use the explicitly provided window."
@@ -704,6 +704,38 @@
                    '(61 . 1))))
         (majutsu-row-refresh-tail-spacers nil nil 'explicit-window))
       (should (eq seen 'explicit-window)))))
+
+(ert-deftest majutsu-log-tail-alignment-is-shared-safely-by-unequal-windows ()
+  "Resizing either log window must not impose its width on the other one."
+  (save-window-excursion
+    (delete-other-windows)
+    (with-temp-buffer
+      (switch-to-buffer (current-buffer))
+      (majutsu-log-mode)
+      (let* ((first (selected-window))
+             (second (split-window first 30 'right))
+             (compiled (majutsu-log-test--tail-compiled))
+             (entry (list :id "id-123"
+                          :columns '((change-id . "chg")
+                                     (id . "id-123")
+                                     (description . "Title")
+                                     (author . "Alice")
+                                     (timestamp . "2m"))
+                          :heading-prefixes '("○ "))))
+        (set-window-buffer second (current-buffer))
+        (should-not (= (window-body-width first) (window-body-width second)))
+        (cl-letf (((symbol-function 'display-graphic-p)
+                   (lambda (&optional _) nil)))
+          (let ((inhibit-read-only t))
+            (majutsu-row-insert-entry entry compiled))
+          (let ((spacer (text-property-any (point-min) (point-max)
+                                           'majutsu-row-tail-spacer t)))
+            (should spacer)
+            (majutsu-log--after-window-size-change first)
+            (let ((display (get-text-property spacer 'display)))
+              (should (equal display '(space :align-to (- right 9))))
+              (majutsu-log--after-window-size-change second)
+              (should (equal (get-text-property spacer 'display) display)))))))))
 
 (ert-deftest majutsu-log-mode-installs-tail-refresh-hooks ()
   "Log mode should install local refresh hooks for scale and window changes."
