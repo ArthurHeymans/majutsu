@@ -3523,6 +3523,12 @@ The columns of a log row; see
   @ref{Log Columns, , Log Columns}.
 @end defopt
 
+@defopt majutsu-log-commit-sections-initially-hidden
+Whether commit
+  sections in log buffers start collapsed (default: @samp{nil}).  Individual
+  sections can still be toggled with @code{TAB}.
+@end defopt
+
 @defopt majutsu-log-elide-description
 Whether long descriptions are
   cut with … to keep the right-hand columns aligned (default: @samp{t}).

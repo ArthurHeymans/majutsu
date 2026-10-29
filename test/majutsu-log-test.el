@@ -115,6 +115,13 @@
     ((listp value) (string-join value majutsu-log--field-list-separator))
     (t (format "%s" value)))))
 
+(ert-deftest majutsu-log-profile-controls-initial-section-visibility ()
+  "The log section visibility option should be passed to the row profile."
+  (let ((majutsu-log-commit-sections-initially-hidden t))
+    (should (eq (plist-get (majutsu-log--row-profile) :section-hide) t)))
+  (let ((majutsu-log-commit-sections-initially-hidden nil))
+    (should-not (plist-get (majutsu-log--row-profile) :section-hide))))
+
 (ert-deftest majutsu-log-insert-conflicts/inherited-conflicts-remain-navigable ()
   "Group inherited conflicts even when the merge has no changes-in diff."
   (majutsu-jj-integration-with-repo repo

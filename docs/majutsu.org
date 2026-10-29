@@ -1921,6 +1921,9 @@ majutsu RET~ shows all of them.
 ** Display Options
 - User Option: majutsu-log-commit-columns :: The columns of a log row; see
   [[#log-columns][Log Columns]].
+- User Option: majutsu-log-commit-sections-initially-hidden :: Whether commit
+  sections in log buffers start collapsed (default: =nil=).  Individual
+  sections can still be toggled with ~TAB~.
 - User Option: majutsu-log-elide-description :: Whether long descriptions are
   cut with … to keep the right-hand columns aligned (default: =t=).
 - User Option: majutsu-log-sections-hook :: The sections of the log buffer:

@@ -124,6 +124,17 @@ rendered by `majutsu-log-insert-error-header' on the next refresh.")
   '[:description :first_line]
   "Machine template for the canonical one-line description.")
 
+(defcustom majutsu-log-commit-sections-initially-hidden nil
+  "Whether commit sections in log buffers are initially collapsed.
+
+When nil (the default), commit bodies are shown immediately.  Users can still
+toggle individual sections with `TAB'."
+  :type 'boolean
+  :group 'majutsu
+  :set (lambda (symbol value)
+         (set-default symbol value)
+         (setq majutsu-log--compiled-template-cache nil)))
+
 (defcustom majutsu-log-commit-columns
   (eval-when-compile
     `((:field change-id :module heading
@@ -334,7 +345,8 @@ Empty summaries produce no brackets.  Only available in the jjosh build."))
    :field-postprocessors majutsu-log--field-default-postprocessors
    :entry-id-function 'majutsu-log--entry-id
    :section-class 'jj-commit
-   :section-value-function 'majutsu-log--entry-id))
+   :section-value-function 'majutsu-log--entry-id
+   :section-hide majutsu-log-commit-sections-initially-hidden))
 
 (defun majutsu-log--ensure-template ()
   "Return the compiled template for the configured log columns."
