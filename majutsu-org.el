@@ -11,16 +11,18 @@
 
 ;;; Commentary:
 
-;; This library defines the Org link types `majutsu' and `majutsu-rev',
-;; in the spirit of `orgit' for Magit:
+;; This library defines the Org link types `majutsu', `majutsu-rev',
+;; `majutsu-log', and `majutsu-file', in the spirit of `orgit' for Magit:
 ;;
-;;   majutsu:/path/to/repo/            opens the repository's log
-;;   majutsu-rev:/path/to/repo/::REV   opens the revision
+;;   majutsu:/path/to/repo/                         opens the repository's log
+;;   majutsu-rev:/path/to/repo/::REV                opens the revision diff
+;;   majutsu-log:/path/to/repo/::REVSET             opens a filtered log buffer
+;;   majutsu-file:/path/to/repo/::REV::FILE::LINE   opens a file at a revision
 ;;
-;; Use `org-store-link' inside a Majutsu buffer to store a link and
-;; `org-insert-link' to insert it.  When the region selects several
-;; revisions, one `majutsu-rev' link is stored for each.  Loading
-;; `majutsu' registers this integration once Org becomes available.
+;; Use `org-store-link' inside a Majutsu buffer (or blob buffer) to store a
+;; link and `org-insert-link' to insert it.  When the region selects several
+;; revisions, one `majutsu-rev' link is stored for each.  Loading `majutsu'
+;; registers this integration once Org becomes available.
 
 ;;; Code:
 
@@ -28,9 +30,18 @@
 (require 'org)
 (require 'url-util)
 
+(defvar majutsu-blob-mode-map)
+(defvar majutsu-buffer-blob-path)
+(defvar majutsu-buffer-log-args)
+(defvar majutsu-buffer-log-filesets)
+
 (declare-function majutsu-log "majutsu-log" (&optional directory))
+(declare-function majutsu-log-mode "majutsu-log" ())
 (declare-function majutsu-diff-revset "majutsu-diff"
                   (revset &optional args range filesets))
+(declare-function majutsu-find-file "majutsu-file" (revset path))
+(declare-function majutsu-file--read-path "majutsu-file"
+                  (revset root &optional default))
 (declare-function majutsu-jj-lines "majutsu-jj" (&rest args))
 (declare-function majutsu-read-revset "majutsu-jj" (prompt &rest args))
 
@@ -264,17 +275,134 @@ available, Org asks which link to store, preferring the revision."
             (majutsu-org--encode-component root)
             (majutsu-org--encode-component (majutsu-read-revset "Revision")))))
 
+(defun majutsu-org--log-revset ()
+  "Return the revision filter represented by the current log buffer."
+  (when (and (derived-mode-p 'majutsu-log-mode)
+             (bound-and-true-p majutsu-buffer-log-args))
+    (when-let* ((argument
+                 (seq-find (lambda (item)
+                             (string-prefix-p "--revisions=" item))
+                           majutsu-buffer-log-args)))
+      (substring argument (length "--revisions=")))))
+
+(defun majutsu-org-store-log ()
+  "Store a `majutsu-log' link for the current filtered log buffer."
+  (when (and (derived-mode-p 'majutsu-log-mode)
+             (not majutsu-org--store-revision-only))
+    (when-let* ((revision (majutsu-org--log-revset))
+                (root (majutsu-org--root)))
+      (org-link-store-props
+       :type "majutsu-log"
+       :link (format "majutsu-log:%s::%s"
+                     (majutsu-org--encode-component root)
+                     (majutsu-org--encode-component revision))
+       :description (format "%s (majutsu-log %s)"
+                            (abbreviate-file-name root) revision)))))
+
+(defun majutsu-org-open-log (path)
+  "Open the revision-filtered Majutsu log encoded in PATH."
+  (require 'majutsu-log)
+  (pcase-let* ((`(,repository . ,revision)
+                (majutsu-org--split-revision-path path "majutsu-log"))
+               (default-directory (file-name-as-directory
+                                   (expand-file-name repository))))
+    (majutsu-setup-buffer #'majutsu-log-mode t
+      (majutsu-buffer-log-args (list (concat "--revisions=" revision)))
+      (majutsu-buffer-log-filesets nil))))
+
+(defun majutsu-org-complete-log (&optional _arg)
+  "Complete a `majutsu-log' link by reading a repository and revset."
+  (let* ((root (or (majutsu-org--root)
+                   (file-name-as-directory
+                    (expand-file-name (read-directory-name "Repository: ")))))
+         (default-directory root))
+    (format "majutsu-log:%s::%s"
+            (majutsu-org--encode-component root)
+            (majutsu-org--encode-component (majutsu-read-revset "Log revset")))))
+
+(defun majutsu-org--parse-file-path (path)
+  "Parse `majutsu-file' link PATH into (REPOSITORY REVISION FILE LINE)."
+  (pcase (split-string path "::")
+    (`(,repository ,revision ,file ,line)
+     (let ((line-number (string-to-number line)))
+       (unless (> line-number 0)
+         (user-error "Invalid line in majutsu-file link: %s" path))
+       (list (majutsu-org--decode-component repository)
+             (majutsu-org--decode-component revision)
+             (majutsu-org--decode-component file)
+             line-number)))
+    (_ (user-error "Invalid majutsu-file link: %s" path))))
+
+(defun majutsu-org-store-file ()
+  "Store a `majutsu-file' link to the current Majutsu blob buffer and line."
+  (when (and (bound-and-true-p majutsu-blob-mode)
+             (bound-and-true-p majutsu-buffer-blob-path)
+             (not majutsu-org--store-revision-only))
+    (when-let* ((root (majutsu-org--root))
+                (source-revision (majutsu-revision-at-point))
+                (revision (majutsu-org--canonical-revision
+                           root source-revision
+                           (majutsu-org--revision-storage-kind)))
+                (file majutsu-buffer-blob-path)
+                (line (line-number-at-pos)))
+      (org-link-store-props
+       :type "majutsu-file"
+       :link (format "majutsu-file:%s::%s::%s::%d"
+                     (majutsu-org--encode-component root)
+                     (majutsu-org--encode-component revision)
+                     (majutsu-org--encode-component file)
+                     line)
+       :description (format "%s:%d (%s)" file line revision)))))
+
+(defun majutsu-org-open-file (path)
+  "Open the historical file and line encoded in PATH."
+  (pcase-let* ((`(,repository ,revision ,file ,line)
+                (majutsu-org--parse-file-path path))
+               (default-directory (file-name-as-directory
+                                   (expand-file-name repository))))
+    (let ((buffer (majutsu-find-file revision file)))
+      (with-current-buffer buffer
+        (goto-char (point-min))
+        (forward-line (1- line))))))
+
+(defun majutsu-org-complete-file (&optional _arg)
+  "Complete a `majutsu-file' link by reading repository, revision, file, and line."
+  (require 'majutsu-file)
+  (let* ((root (or (majutsu-org--root)
+                   (file-name-as-directory
+                    (expand-file-name (read-directory-name "Repository: ")))))
+         (default-directory root)
+         (revision (majutsu-read-revset "Revision"))
+         (file (majutsu-file--read-path revision root))
+         (line (read-number "Line: " 1)))
+    (format "majutsu-file:%s::%s::%s::%d"
+            (majutsu-org--encode-component root)
+            (majutsu-org--encode-component revision)
+            (majutsu-org--encode-component file)
+            line)))
+
 (defun majutsu-org-setup ()
   "Register the Majutsu Org link types and the `org-store-link' remap."
   (org-link-set-parameters "majutsu-rev"
                            :store #'majutsu-org-store-revision
                            :follow #'majutsu-org-open-revision
                            :complete #'majutsu-org-complete-revision)
+  (org-link-set-parameters "majutsu-log"
+                           :store #'majutsu-org-store-log
+                           :follow #'majutsu-org-open-log
+                           :complete #'majutsu-org-complete-log)
+  (org-link-set-parameters "majutsu-file"
+                           :store #'majutsu-org-store-file
+                           :follow #'majutsu-org-open-file
+                           :complete #'majutsu-org-complete-file)
   (org-link-set-parameters "majutsu"
                            :store #'majutsu-org-store-repository
                            :follow #'majutsu-org-open-repository
                            :complete #'majutsu-org-complete-repository)
-  (keymap-set majutsu-mode-map "<remap> <org-store-link>" #'majutsu-org-store-link))
+  (keymap-set majutsu-mode-map "<remap> <org-store-link>" #'majutsu-org-store-link)
+  (with-eval-after-load 'majutsu-file
+    (keymap-set majutsu-blob-mode-map "<remap> <org-store-link>"
+                #'majutsu-org-store-link)))
 
 (majutsu-org-setup)
 

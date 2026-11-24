@@ -2148,17 +2148,31 @@ be tracked in Forge's database.
   from Forge's sections in the echo area.
 
 ** Org Links
-Majutsu defines two Org link types, like Orgit does for Magit:
+Majutsu defines four Org link types, like Orgit does for Magit:
 
 #+begin_example
-majutsu:/path/to/repo/            opens the repository's log
-majutsu-rev:/path/to/repo/::REV   opens the diff of the revision
+majutsu:/path/to/repo/                         opens the repository's log
+majutsu-rev:/path/to/repo/::REV                opens the diff of the revision
+majutsu-log:/path/to/repo/::REVSET             opens a filtered log buffer
+majutsu-file:/path/to/repo/::REV::FILE::LINE   opens a file at a revision and line
 #+end_example
 
-~org-store-link~ in a Majutsu buffer stores a link to the revision at point,
-or to the repository; with several revisions in the region it stores one
-link for each.  ~org-insert-link~ inserts them, and completes either type
-by asking for a repository and a revision.  Nothing needs to be enabled.
+~org-store-link~ in a Majutsu buffer (or blob buffer) stores a link to the
+revision at point, filtered log, historical file, or repository; with several
+revisions in the region it stores one link for each.  ~org-insert-link~ inserts
+them and completes each type interactively.  Nothing needs to be enabled.
+
+Single-commit links store canonical change IDs by default so links follow
+rewrites; pass ~C-u~ for an immutable commit ID or ~C-u C-u~ for the symbolic
+revision.  Link components are percent-encoded while keeping ~/~ readable, and
+revsets containing =::= are preserved.
+
+- User Option: majutsu-org-revision-storage :: Default identity stored for
+  single-commit links: =change-id= (default), =commit-id=, or =symbolic=.
+- User Option: majutsu-org-prompt-for-symbolic-revisions :: When non-nil
+  (default: =t=), prompt to choose between change ID, commit ID, bookmark, or
+  tag whenever a single commit has bookmarks or tags (or =always= for every
+  single commit).  Prefix arguments bypass the prompt.
 
 ** Bug References
 :PROPERTIES:
