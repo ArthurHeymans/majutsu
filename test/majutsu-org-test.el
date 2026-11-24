@@ -104,5 +104,72 @@
     (should (equal revision "abc123"))
     (should (equal directory "/repo/"))))
 
+(ert-deftest majutsu-org-open-revision/preserves-range-revsets-and-decodes ()
+  (let (revision directory)
+    (cl-letf (((symbol-function 'majutsu-diff-revset)
+               (lambda (rev &rest _args)
+                 (setq revision rev
+                       directory default-directory))))
+      (majutsu-org-open-revision "/my%20repo/::main::@")
+      (should (equal directory "/my repo/"))
+      (should (equal revision "main::@"))
+      (majutsu-org-open-revision "/my%20repo/::main%3A%3A%40")
+      (should (equal directory "/my repo/"))
+      (should (equal revision "main::@")))))
+
+(ert-deftest majutsu-org-store-revision/encodes-components ()
+  (majutsu-org-test--with-buffer "/my repo/" "main::@"
+    (let ((majutsu-org-prompt-for-symbolic-revisions nil)
+          (majutsu-org-revision-storage 'symbolic))
+      (should (majutsu-org-store-revision))
+      (should (equal (plist-get org-store-link-plist :link)
+                     "majutsu-rev:/my%20repo/::main%3A%3A%40")))))
+
+(ert-deftest majutsu-org-store-revision/canonical-and-prefix-overrides ()
+  (majutsu-org-test--with-buffer "/repo/" "main"
+    (let ((majutsu-org-prompt-for-symbolic-revisions nil))
+      (cl-letf (((symbol-function 'majutsu-jj-lines)
+                 (lambda (&rest args)
+                   (if (string-match-p "commit_id" (car (last args)))
+                       '("0123456789abcdef0123456789abcdef01234567")
+                     '("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz")))))
+        (let ((current-prefix-arg nil))
+          (majutsu-org-store-revision)
+          (should (equal (plist-get org-store-link-plist :link)
+                         "majutsu-rev:/repo/::zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz")))
+        (let ((current-prefix-arg '(4)))
+          (majutsu-org-store-revision)
+          (should (equal (plist-get org-store-link-plist :link)
+                         "majutsu-rev:/repo/::0123456789abcdef0123456789abcdef01234567")))
+        (let ((current-prefix-arg '(16)))
+          (majutsu-org-store-revision)
+          (should (equal (plist-get org-store-link-plist :link)
+                         "majutsu-rev:/repo/::main")))))))
+
+(ert-deftest majutsu-org-store-revision/prompts-for-bookmark-or-tag ()
+  (dolist (case `(("bookmark-only"
+                   ,(concat "zzzzzzzzzzzzzzzz" "\x1e" "0123456789abcdef" "\x1e" "main" "\x1e")
+                   "Bookmark: main"
+                   "main")
+                  ("tag-only"
+                   ,(concat "zzzzzzzzzzzzzzzz" "\x1e" "0123456789abcdef" "\x1e" "\x1e" "v1.0")
+                   "Tag: v1.0"
+                   "v1.0")))
+    (pcase-let ((`(,_label ,line ,choice ,expected) case))
+      (majutsu-org-test--with-buffer "/repo/" "rev"
+        (let ((majutsu-org-prompt-for-symbolic-revisions t)
+              (current-prefix-arg nil)
+              prompted-choices)
+          (cl-letf (((symbol-function 'majutsu-jj-lines)
+                     (lambda (&rest _args) (list line)))
+                    ((symbol-function 'completing-read)
+                     (lambda (_prompt choices &rest _args)
+                       (setq prompted-choices (mapcar #'car choices))
+                       choice)))
+            (majutsu-org-store-revision)
+            (should (member choice prompted-choices))
+            (should (equal (plist-get org-store-link-plist :link)
+                           (format "majutsu-rev:/repo/::%s" expected)))))))))
+
 (provide 'majutsu-org-test)
 ;;; majutsu-org-test.el ends here
